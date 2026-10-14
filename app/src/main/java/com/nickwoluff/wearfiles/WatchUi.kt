@@ -59,6 +59,7 @@ fun WatchApp(state: BrowserState, actions: BrowserActions, navController: NavHos
     CompositionLocalProvider(LocalConfiguration provides layoutConfig,
         LocalDensity provides Density(density.density * state.settings.scale / 100f, density.fontScale)) {
     MaterialTheme(colorScheme = colors, motionScheme = MotionScheme.expressive()) {
+        WatchHapticFeedbackProvider {
         AppScaffold(timeText = { WatchTimeText() }) {
             val currentState by rememberUpdatedState(state)
             val currentActions by rememberUpdatedState(actions)
@@ -107,6 +108,7 @@ fun WatchApp(state: BrowserState, actions: BrowserActions, navController: NavHos
             notice?.let { current -> key(current.id) {
                 WatchFloatingNotice(current) { dismissNotice(current.id) }
             } }
+        }
         }
     }
     }

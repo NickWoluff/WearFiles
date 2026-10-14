@@ -3,3 +3,6 @@
 -keepclassmembers,allowoptimization,allowobfuscation class com.nickwoluff.wearfiles.UpdateViewModel {
     public <init>();
 }
+
+-keep class com.google.wear.input.WearHapticFeedbackConstants { *; }
+

@@ -13,6 +13,9 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
+import android.view.InputDevice
+import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
 import android.webkit.MimeTypeMap
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -29,8 +32,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import java.io.File
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 class MainActivity : ComponentActivity() {
+    private var rotaryAccumulator = 0f
     private var resumeTick by mutableIntStateOf(0)
     private val updates by lazy { ViewModelProvider(this)[UpdateViewModel::class.java] }
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,6 +44,28 @@ class MainActivity : ComponentActivity() {
         setContent { FileManagerApp(this, resumeTick, updates) }
     }
     override fun onResume() { super.onResume(); resumeTick++ }
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (event.action == MotionEvent.ACTION_SCROLL
+            && event.isFromSource(InputDevice.SOURCE_ROTARY_ENCODER)) {
+            val axis = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                MotionEvent.AXIS_SCROLL else MotionEvent.AXIS_VSCROLL
+            val delta = -event.getAxisValue(axis)
+            if (delta != 0f) {
+                rotaryAccumulator += delta
+                if (abs(rotaryAccumulator) >= WatchHaptics.ROTARY_THRESHOLD) {
+                    val decor = window.decorView
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        decor.performHapticFeedback(18)
+                    } else {
+                        decor.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    }
+                    rotaryAccumulator = 0f
+                }
+            }
+        }
+        return super.dispatchGenericMotionEvent(event)
+    }
 }
 enum class Page { HOME, FILES, TOOLS, ACCESS, ADB, DETAILS, SETTINGS, THEME, MOVE }
 enum class NoticeKind { INFO, SUCCESS, ERROR }
