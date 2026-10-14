@@ -2,7 +2,6 @@
 
 ![Version](https://img.shields.io/badge/version-1.0.0-brightgreen?style=flat-square)
 ![Android](https://img.shields.io/badge/Android-7.1%2B-3DDC84?style=flat-square&logo=android&logoColor=white)
-![UI](https://img.shields.io/badge/UI-Wear_Material_3-6750A4?style=flat-square)
 
 **专为圆形与方形智能手表打造的文件管理器，嗷呜！**
 
@@ -21,21 +20,17 @@
 
 ## 📥 下载与安装 (Installation)
 
-面向 Android 7.1（API 25）及以上的智能手表，仅提供圆屏与方屏手表布局。
+**应用商店安装**：前往 **微思应用商店** 手表端，搜索“嗷呜文件”下载安装。
 
-当前源码版本为 **1.0.0**（`versionCode 1`）。仓库目前尚未发布正式 Release，可先[自行构建](#development)；后续安装包请查看 [Releases](https://github.com/NickWoluff/WearFiles/releases)。
+**ADB 手动安装**：
 
-### ADB 安装
+1. 前往 [Releases](https://github.com/NickWoluff/WearFiles/releases) 页面下载 APK。
+2. 在手表上开启**开发者模式**和 **ADB 调试 / 无线调试**，完成连接。
+3. 使用甲壳虫 ADB 助手、WearOS 工具箱，或电脑端 ADB 安装：
 
-1. 在手表上开启开发者模式及 ADB 调试 / 无线调试。
-2. 使用电脑端 ADB，或甲壳虫 ADB 助手、Wear OS 工具箱等工具连接手表。
-3. 将 APK 安装到手表。电脑端命令如下，请将文件名替换为实际下载或构建的 APK：
+   ```bash
+   adb install -r WearFiles_vX.X.X.apk
 
-```bash
-adb install -r WearFiles.apk
-```
-
-首次打开后，请按照应用内指引完成存储读写授权。
 
 ## 📂 使用指南 (Usage)
 
@@ -130,8 +125,10 @@ $env:JAVA_TOOL_OPTIONS = "-Djdk.net.unixdomain.tmpdir=$socketPath"
 
 ## 💬 交流与反馈 (Community)
 
-使用时遇到问题或有功能建议，欢迎提交至 [Issues](https://github.com/NickWoluff/WearFiles/issues)。请尽量附上手表型号、系统与应用版本、屏幕形状、复现步骤及截图。
+使用时遇到问题或有功能建议，欢迎提交至 [Issues](https://github.com/NickWoluff/WearFiles/issues)。或：
 
-同系列应用：[🐾 嗷呜计算器 (WearCalculator)](https://github.com/NickWoluff/WearCalculator)
+>加入 **嗷呜系列官方QQ交流群**：`暂无`
+
+同系列应用：[🐾 嗷呜计算器](https://github.com/NickWoluff/WearCalculator)
 
 © 2026 Nick Woluff. All Rights Reserved.
