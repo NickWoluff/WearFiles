@@ -3,6 +3,8 @@
 .socket-tmp/
 build/
 app/build/
+app/release/
+VERIFICATION.md
 local.properties
 design-reference/
 .idea/
