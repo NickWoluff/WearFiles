@@ -10,7 +10,7 @@ import java.io.File
 import java.text.DateFormat
 import java.util.Date
 
-internal enum class RowKind { ACTION, SECTION, INFO, SCALE, COMMANDS }
+internal enum class RowKind { ACTION, SECTION, INFO, SCALE, COMMANDS, FOOTER }
 internal data class BrowserRow(
     val key: String, val label: String, val detail: String? = null,
     val icon: ImageVector = Icons.Default.Folder, val kind: RowKind = RowKind.ACTION,
@@ -58,6 +58,11 @@ internal fun browserRows(s: BrowserState, a: BrowserActions): List<BrowserRow> =
             add(BrowserRow("theme", "主题设置", "颜色、调色板与显示缩放", Icons.Default.Palette, primary = true, click = a.themePage))
             add(BrowserRow("layout", "屏幕布局", s.settings.layout.label, Icons.Default.Watch, click = a.layoutPicker))
             add(BrowserRow("access", "存储权限", if (s.access) "读写检查通过" else "未完成授权", Icons.Default.Security, click = a.accessPage))
+            add(BrowserRow("check-update", if (s.checkingUpdate) "正在检查…" else "检查更新",
+                "当前版本 ${s.localVersion}", Icons.Default.Update, click = a.checkUpdate, enabled = !s.checkingUpdate))
+            add(BrowserRow("auto-update", "自动检查更新", if (s.autoCheckUpdates) "启动时检查" else "仅手动检查",
+                Icons.Default.Autorenew, checked = s.autoCheckUpdates, click = a.toggleAutoUpdate))
+            add(BrowserRow("copyright", s.copyright, kind = RowKind.FOOTER))
         }
         Page.THEME -> {
             add(BrowserRow("scale", "显示缩放", kind = RowKind.SCALE, scale = s.settings.scale,

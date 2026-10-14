@@ -36,6 +36,8 @@ class SettingsStore(context: Context) {
     }
     fun skippedStorageGuide(): Boolean = prefs.getBoolean("storage_guide_skipped", false)
     fun skipStorageGuide() { prefs.edit().putBoolean("storage_guide_skipped", true).apply() }
+    fun autoCheckUpdates(): Boolean = prefs.getBoolean("auto_check_updates", true)
+    fun setAutoCheckUpdates(enabled: Boolean) { prefs.edit().putBoolean("auto_check_updates", enabled).apply() }
     fun readSpace(): StorageSpace = StorageSpace(prefs.getLong("space_available", 0), prefs.getLong("space_total", 0))
     fun writeSpace(space: StorageSpace) {
         if (space.total > 0) prefs.edit().putLong("space_available", space.available)

@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Density
 import kotlin.math.roundToInt
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -203,6 +204,11 @@ private fun WatchTitle(state: BrowserState) {
 @Composable
 private fun WatchRow(row: BrowserRow, modifier: Modifier, transformation: SurfaceTransformation? = null) {
     when (row.kind) {
+        RowKind.FOOTER -> ListSubHeader(modifier = modifier, transformation = transformation) {
+            Text(row.label, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         RowKind.COMMANDS -> Card(onClick = row.click, modifier = modifier, transformation = transformation) {
             Text(row.label, style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
@@ -277,6 +283,18 @@ private fun WatchRow(row: BrowserRow, modifier: Modifier, transformation: Surfac
 
 @Composable
 private fun OperationDialogs(state: BrowserState, actions: BrowserActions, dialog: String?) {
+    AlertDialog(visible = state.availableVersion != null && dialog == null && !state.checkingAccess &&
+        state.page != Page.ACCESS && state.page != Page.ADB,
+        onDismissRequest = actions.dismissUpdate,
+        title = { Text("发现新版本 ${state.availableVersion.orEmpty()}") },
+        text = { Text("可前往 GitHub Release 页面更新") },
+        content = {
+            item { Button(onClick = actions.openRelease, modifier = Modifier.fillMaxWidth()) {
+                Text("前往 Release")
+            } }
+            item { Button(onClick = actions.dismissUpdate, modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.filledTonalButtonColors()) { Text("稍后再说") } }
+        })
     AlertDialog(visible = dialog == "layout", onDismissRequest = actions.dismissDialog,
         title = { Text("屏幕布局") }, content = {
             ScreenLayout.entries.forEach { layout -> item {

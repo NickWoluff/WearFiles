@@ -25,15 +25,18 @@ import androidx.core.content.FileProvider
 import androidx.wear.input.RemoteInputIntentHelper
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import androidx.navigation.NavController
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelProvider
 import java.io.File
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var resumeTick by mutableIntStateOf(0)
+    private val updates by lazy { ViewModelProvider(this)[UpdateViewModel::class.java] }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { FileManagerApp(this, resumeTick) }
+        setContent { FileManagerApp(this, resumeTick, updates) }
     }
     override fun onResume() { super.onResume(); resumeTick++ }
 }
@@ -52,7 +55,9 @@ data class BrowserState(
     val hidden: Boolean, val newest: Boolean, val selected: FileEntry?, val settings: AppSettings,
     val busy: Boolean, val backLocation: BrowserLocation?, val shareTargets: List<ShareTarget> = emptyList(),
     val checkingAccess: Boolean = false, val accessCheck: StorageAccessCheck = StorageAccessCheck(),
-    val adbCommands: String = ""
+    val adbCommands: String = "", val localVersion: String = "", val autoCheckUpdates: Boolean = true,
+    val checkingUpdate: Boolean = false, val availableVersion: String? = null,
+    val copyright: String = ""
 ) {
     val location: BrowserLocation get() = BrowserLocation(page, if (page == Page.HOME) root else path,
         if (page == Page.DETAILS) selected?.path else null)
@@ -67,14 +72,19 @@ data class BrowserActions(
     val operations: (FileEntry) -> Unit, val rename: () -> Unit, val move: () -> Unit,
     val confirmMove: () -> Unit, val askDelete: () -> Unit, val delete: () -> Unit,
     val dismissDialog: () -> Unit, val shareTo: (ShareTarget) -> Unit, val recheckAccess: () -> Unit,
-    val adbGuide: () -> Unit, val copyAdbCommands: () -> Unit, val skipAccess: () -> Unit
+    val adbGuide: () -> Unit, val copyAdbCommands: () -> Unit, val skipAccess: () -> Unit,
+    val checkUpdate: () -> Unit, val toggleAutoUpdate: () -> Unit,
+    val dismissUpdate: () -> Unit, val openRelease: () -> Unit
 )
 
 @Composable
-private fun FileManagerApp(activity: MainActivity, resumeTick: Int) {
+private fun FileManagerApp(activity: MainActivity, resumeTick: Int, updates: UpdateViewModel) {
     val repository = remember { StorageRepository(Environment.getExternalStorageDirectory()) }
     val nav = rememberSwipeDismissableNavController()
     val store = remember { SettingsStore(activity) }
+    val localVersion = remember { activity.packageManager.getPackageInfo(activity.packageName, 0).versionName.orEmpty() }
+    var autoCheckUpdates by remember { mutableStateOf(store.autoCheckUpdates()) }
+    val copyright = remember(resumeTick) { copyrightText(java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)) }
     var settings by remember { mutableStateOf(store.read()) }
     var guideSkipped by remember { mutableStateOf(store.skippedStorageGuide()) }
     var authorizationReturned by rememberSaveable { mutableStateOf(false) }
@@ -106,6 +116,15 @@ private fun FileManagerApp(activity: MainActivity, resumeTick: Int) {
     var noticeId by remember { mutableIntStateOf(0) }
     fun notify(message: String, kind: NoticeKind = NoticeKind.INFO) {
         notice = WatchNotice(++noticeId, message, kind)
+    }
+    LaunchedEffect(updates) { updates.checkOnce(localVersion, store::autoCheckUpdates) }
+    LaunchedEffect(updates.feedback, resumeTick) {
+        if (activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            updates.feedback?.let {
+                notify(it.message, if (it.error) NoticeKind.ERROR else NoticeKind.SUCCESS)
+                updates.consumeFeedback()
+            }
+        }
     }
     DisposableEffect(nav) {
         val listener = NavController.OnDestinationChangedListener { _, _, arguments ->
@@ -251,7 +270,8 @@ private fun FileManagerApp(activity: MainActivity, resumeTick: Int) {
         nav.previousBackStackEntry?.arguments?.let { args ->
             BrowserLocation(Page.valueOf(args.getString("kind") ?: "HOME"), args.getString("directory") ?: repository.root.path,
                 args.getString("file")?.takeIf { it.isNotEmpty() })
-        }, shareTargets, checkingAccess, accessCheck, adbCommands)
+        }, shareTargets, checkingAccess, accessCheck, adbCommands, localVersion,
+        autoCheckUpdates, updates.checking, updates.availableVersion, copyright)
     val actions = BrowserActions(
         home = { nav.popBackStack(BrowserLocation(Page.HOME, repository.root.path).route, false) },
         browse = {
@@ -306,6 +326,20 @@ private fun FileManagerApp(activity: MainActivity, resumeTick: Int) {
             store.skipStorageGuide()
             nav.popBackStack(BrowserLocation(Page.HOME, repository.root.path).route, false)
             refresh++
+        }, checkUpdate = { updates.checkManually(localVersion) },
+        toggleAutoUpdate = {
+            autoCheckUpdates = !autoCheckUpdates
+            store.setAutoCheckUpdates(autoCheckUpdates)
+            if (!autoCheckUpdates) updates.dismissRelease()
+        }, dismissUpdate = updates::dismissRelease,
+        openRelease = {
+            updates.dismissRelease()
+            try { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(RELEASES_URL))) }
+            catch (_: ActivityNotFoundException) {
+                notify("请在手机浏览器访问 github.com/NickWoluff/WearFiles/releases 更新", NoticeKind.ERROR)
+            } catch (_: SecurityException) {
+                notify("无法打开浏览器，请在手机访问 github.com/NickWoluff/WearFiles/releases", NoticeKind.ERROR)
+            }
         }
     )
     WatchApp(state, actions, nav, dialog, notice) { id -> if (notice?.id == id) notice = null }
