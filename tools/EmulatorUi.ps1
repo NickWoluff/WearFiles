@@ -5,10 +5,12 @@ param(
     [string]$Name = 'runtime',
     [int]$Width = 454,
     [int]$Height = 454,
-    [int]$Count = 1
+    [int]$Count = 1,
+    [string]$Adb = $(if ($env:ANDROID_HOME) { Join-Path $env:ANDROID_HOME 'platform-tools\adb.exe' }
+        elseif ($env:ANDROID_SDK_ROOT) { Join-Path $env:ANDROID_SDK_ROOT 'platform-tools\adb.exe' }
+        else { 'adb' })
 )
 $ErrorActionPreference = 'Stop'
-$adb = 'F:\Android\SDK\platform-tools\adb.exe'
 $outputDir = Join-Path $PSScriptRoot '..\screenshots'
 New-Item -ItemType Directory -Force $outputDir | Out-Null
 function Dump-Ui {

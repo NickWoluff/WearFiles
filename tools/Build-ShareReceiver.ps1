@@ -1,8 +1,9 @@
 param(
-    [string]$Sdk = 'F:\Android\SDK',
-    [string]$Jdk = 'F:\ENV\Java\JDK-21'
+    [string]$Sdk = $(if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { $env:ANDROID_SDK_ROOT }),
+    [string]$Jdk = $env:JAVA_HOME
 )
 $ErrorActionPreference = 'Stop'
+if (!$Sdk -or !$Jdk) { throw '请设置 ANDROID_HOME（或 ANDROID_SDK_ROOT）与 JAVA_HOME，或传入 -Sdk 和 -Jdk。' }
 $env:JAVA_HOME = $Jdk
 $source = Join-Path $PSScriptRoot 'fixtures\share-receiver'
 $output = Join-Path $PSScriptRoot '..\build\qa-sharing'

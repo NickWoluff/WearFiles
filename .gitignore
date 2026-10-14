@@ -12,6 +12,17 @@ design-reference/
 *.aab
 *.jks
 *.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+.env
+.env.*
+key.properties
+keystore.properties
+signing.properties
+*.hprof
+captures/
 screenshots/
 anexplorer-reference.png
 anexplorer-reference.xml
