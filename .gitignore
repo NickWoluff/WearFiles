@@ -1,0 +1,17 @@
+.gradle/
+.kotlin/
+.socket-tmp/
+build/
+app/build/
+local.properties
+design-reference/
+.idea/
+*.iml
+*.log
+*.apk
+*.aab
+*.jks
+*.keystore
+screenshots/
+anexplorer-reference.png
+anexplorer-reference.xml

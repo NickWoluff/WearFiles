@@ -1,0 +1,8 @@
+// 隔离安装测试首次授权，避免清除正式应用的主题偏好或权限。
+allprojects {
+    plugins.withId('com.android.application') {
+        androidComponents.finalizeDsl { extension ->
+            extension.defaultConfig.applicationId = 'com.nickwoluff.wearfiles.permissionqa'
+        }
+    }
+}

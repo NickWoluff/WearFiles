@@ -1,0 +1,20 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.nickwoluff.wearfiles.qareceiver">
+    <uses-sdk android:minSdkVersion="25" android:targetSdkVersion="36" />
+    <application android:label="文件分享验证" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false" android:debuggable="true">
+        <activity android:name=".ReceiverActivity" android:label="测试接收器 A" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".SecondReceiverActivity" android:label="测试接收器 B" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".ClipboardActivity" android:exported="true" />
+    </application>
+</manifest>
