@@ -17,6 +17,14 @@ android {
         versionName "1.0.0"
     }
 
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -24,6 +32,15 @@ android {
 
     buildFeatures {
         compose true
+    }
+}
+
+// 使用当前 AGP 的公开 API，版本改动后自动同步 APK 文件名。
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.each { output ->
+            output.outputFileName.set(output.versionName.map { version -> "WearFiles_v${version}.apk" })
+        }
     }
 }
 
