@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Settings
@@ -18,9 +21,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Density
 import kotlin.math.roundToInt
 import androidx.compose.ui.text.style.TextOverflow
@@ -285,6 +292,42 @@ private fun WatchRow(row: BrowserRow, modifier: Modifier, transformation: Surfac
 
 @Composable
 private fun OperationDialogs(state: BrowserState, actions: BrowserActions, dialog: String?) {
+    val keyboard = LocalSoftwareKeyboardController.current
+    val nameFocus = remember { FocusRequester() }
+    // 由编辑器直接持有输入状态，避免系统输入法提交组合文字时读到上一帧的名称。
+    val nameState = remember(dialog == "name", state.renaming, state.nameInput) { TextFieldState(state.nameInput) }
+    AlertDialog(visible = dialog == "name", onDismissRequest = actions.dismissDialog,
+        title = { Text(if (state.renaming) "重命名" else "新建文件夹") },
+        edgeButton = {
+            EdgeButton(onClick = { actions.confirmName(nameState.text.toString()) },
+                enabled = nameState.text.isNotBlank() && !state.busy,
+                buttonSize = EdgeButtonSize.Medium) { Text(if (state.renaming) "保存" else "创建") }
+        },
+        content = {
+            item {
+                Card(onClick = { nameFocus.requestFocus(); keyboard?.show() }, modifier = Modifier.fillMaxWidth()) {
+                    BasicTextField(state = nameState,
+                        modifier = Modifier.fillMaxWidth().focusRequester(nameFocus),
+                        lineLimits = androidx.compose.foundation.text.input.TextFieldLineLimits.SingleLine,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
+                        onKeyboardAction = { actions.confirmName(nameState.text.toString()) },
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                        decorator = { inner ->
+                            if (nameState.text.isEmpty()) {
+                                Text(if (state.renaming) "输入新名称" else "输入文件夹名称",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            inner()
+                        })
+                    LaunchedEffect(Unit) {
+                        withFrameNanos { }
+                        nameFocus.requestFocus()
+                        keyboard?.show()
+                    }
+                }
+            }
+        })
     AlertDialog(visible = state.availableVersion != null && dialog == null && !state.checkingAccess &&
         state.page != Page.ACCESS && state.page != Page.ADB,
         onDismissRequest = actions.dismissUpdate,

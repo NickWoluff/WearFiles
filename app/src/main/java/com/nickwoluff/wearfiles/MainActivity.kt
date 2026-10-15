@@ -1,7 +1,6 @@
 package com.nickwoluff.wearfiles
 
 import android.Manifest
-import android.app.RemoteInput
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -25,7 +24,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.core.content.FileProvider
-import androidx.wear.input.RemoteInputIntentHelper
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import androidx.navigation.NavController
 import androidx.lifecycle.Lifecycle
@@ -84,7 +82,7 @@ data class BrowserState(
     val checkingAccess: Boolean = false, val accessCheck: StorageAccessCheck = StorageAccessCheck(),
     val adbCommands: String = "", val localVersion: String = "", val autoCheckUpdates: Boolean = true,
     val checkingUpdate: Boolean = false, val availableVersion: String? = null,
-    val copyright: String = ""
+    val copyright: String = "", val nameInput: String = "", val renaming: Boolean = false
 ) {
     val location: BrowserLocation get() = BrowserLocation(page, if (page == Page.HOME) root else path,
         if (page == Page.DETAILS) selected?.path else null)
@@ -101,7 +99,8 @@ data class BrowserActions(
     val dismissDialog: () -> Unit, val shareTo: (ShareTarget) -> Unit, val recheckAccess: () -> Unit,
     val adbGuide: () -> Unit, val copyAdbCommands: () -> Unit, val skipAccess: () -> Unit,
     val checkUpdate: () -> Unit, val toggleAutoUpdate: () -> Unit,
-    val dismissUpdate: () -> Unit, val openRelease: () -> Unit
+    val dismissUpdate: () -> Unit, val openRelease: () -> Unit,
+    val confirmName: (String) -> Unit
 )
 
 @Composable
@@ -136,6 +135,7 @@ private fun FileManagerApp(activity: MainActivity, resumeTick: Int, updates: Upd
     var shareTargets by remember { mutableStateOf<List<ShareTarget>>(emptyList()) }
     var inputAction by rememberSaveable { mutableStateOf("create") }
     var inputPath by rememberSaveable { mutableStateOf(repository.root.path) }
+    var nameInput by rememberSaveable { mutableStateOf("") }
     var moveSource by rememberSaveable { mutableStateOf<String?>(null) }
     var moveOrigin by rememberSaveable { mutableStateOf(repository.root.path) }
     val scope = rememberCoroutineScope()
@@ -187,34 +187,32 @@ private fun FileManagerApp(activity: MainActivity, resumeTick: Int, updates: Upd
             } finally { busy = false }
         }
     }
-    val inputLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val name = result.data?.let { RemoteInput.getResultsFromIntent(it)?.getCharSequence("name")?.toString() }
-        if (name != null) {
-            val source = inputPath
-            if (inputAction == "rename") perform({ repository.rename(source, name) })
-            else {
-                busy = true
-                scope.launch {
-                    try {
-                        val message = repository.createFolder(source, name)
-                        notify(message, if (message.startsWith("已创建")) NoticeKind.SUCCESS else NoticeKind.ERROR)
-                        invalidate()
-                    } finally { busy = false }
-                }
-            }
-        }
-    }
     fun requestName(rename: Boolean) {
         if (busy) return
-        dialog = null
         inputAction = if (rename) "rename" else "create"
         inputPath = if (rename) selected?.path ?: return else path
-        val intent = RemoteInputIntentHelper.createActionRemoteInputIntent()
-        RemoteInputIntentHelper.putRemoteInputsExtra(intent, listOf(RemoteInput.Builder("name")
-            .setLabel(if (rename) "新名称" else "文件夹名称").build()))
-        RemoteInputIntentHelper.putTitleExtra(intent, if (rename) "重命名 ${selected?.name}" else "新建文件夹")
-        RemoteInputIntentHelper.putConfirmLabelExtra(intent, if (rename) "保存" else "创建")
-        try { inputLauncher.launch(intent) } catch (_: ActivityNotFoundException) { notify("系统未提供手表文字输入", NoticeKind.ERROR) }
+        nameInput = if (rename) selected?.name.orEmpty() else ""
+        dialog = "name"
+    }
+    fun confirmName(input: String) {
+        if (busy) return
+        val name = input.trim()
+        if (name.isEmpty()) {
+            notify("名称不能为空", NoticeKind.ERROR)
+            return
+        }
+        dialog = null
+        if (inputAction == "rename") perform({ repository.rename(inputPath, name) })
+        else {
+            busy = true
+            scope.launch {
+                try {
+                    val message = repository.createFolder(inputPath, name)
+                    notify(message, if (message.startsWith("已创建")) NoticeKind.SUCCESS else NoticeKind.ERROR)
+                    invalidate()
+                } finally { busy = false }
+            }
+        }
     }
     LaunchedEffect(path, hidden, newest, refresh, access, resumeTick) {
         loading = true
@@ -298,7 +296,8 @@ private fun FileManagerApp(activity: MainActivity, resumeTick: Int, updates: Upd
             BrowserLocation(Page.valueOf(args.getString("kind") ?: "HOME"), args.getString("directory") ?: repository.root.path,
                 args.getString("file")?.takeIf { it.isNotEmpty() })
         }, shareTargets, checkingAccess, accessCheck, adbCommands, localVersion,
-        autoCheckUpdates, updates.checking, updates.availableVersion, copyright)
+        autoCheckUpdates, updates.checking, updates.availableVersion, copyright,
+        nameInput, inputAction == "rename")
     val actions = BrowserActions(
         home = { nav.popBackStack(BrowserLocation(Page.HOME, repository.root.path).route, false) },
         browse = {
@@ -367,7 +366,8 @@ private fun FileManagerApp(activity: MainActivity, resumeTick: Int, updates: Upd
             } catch (_: SecurityException) {
                 notify("无法打开浏览器，请在手机访问 github.com/NickWoluff/WearFiles/releases", NoticeKind.ERROR)
             }
-        }
+        },
+        confirmName = { confirmName(it) }
     )
     WatchApp(state, actions, nav, dialog, notice) { id -> if (notice?.id == id) notice = null }
 }

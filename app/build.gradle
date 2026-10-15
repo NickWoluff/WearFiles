@@ -13,8 +13,8 @@ android {
         applicationId "com.nickwoluff.wearfiles"
         minSdk 25
         targetSdk 36
-        versionCode 1
-        versionName "1.0.0"
+        versionCode 2
+        versionName "1.0.1"
     }
 
     buildTypes {
@@ -55,7 +55,6 @@ dependencies {
     implementation "androidx.wear.compose:compose-material3:1.7.1"
     implementation "androidx.wear.compose:compose-foundation:1.7.1"
     implementation "androidx.wear.compose:compose-navigation:1.7.1"
-    implementation "androidx.wear:wear-input:1.2.0"
     implementation "androidx.core:core-ktx:1.17.0"
     testImplementation "junit:junit:4.13.2"
 }
