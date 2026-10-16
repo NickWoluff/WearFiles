@@ -13,7 +13,6 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
 import android.view.InputDevice
-import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.webkit.MimeTypeMap
 import androidx.activity.ComponentActivity
@@ -44,6 +43,11 @@ class MainActivity : ComponentActivity() {
     override fun onResume() { super.onResume(); resumeTick++ }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        handleRotaryHaptics(event)
+        return super.dispatchGenericMotionEvent(event)
+    }
+
+    internal fun handleRotaryHaptics(event: MotionEvent) {
         if (event.action == MotionEvent.ACTION_SCROLL
             && event.isFromSource(InputDevice.SOURCE_ROTARY_ENCODER)) {
             val axis = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -52,17 +56,11 @@ class MainActivity : ComponentActivity() {
             if (delta != 0f) {
                 rotaryAccumulator += delta
                 if (abs(rotaryAccumulator) >= WatchHaptics.ROTARY_THRESHOLD) {
-                    val decor = window.decorView
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        decor.performHapticFeedback(18)
-                    } else {
-                        decor.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                    }
+                    WatchHaptics.perform(window.decorView)
                     rotaryAccumulator = 0f
                 }
             }
         }
-        return super.dispatchGenericMotionEvent(event)
     }
 }
 enum class Page { HOME, FILES, TOOLS, ACCESS, ADB, DETAILS, SETTINGS, THEME, MOVE }

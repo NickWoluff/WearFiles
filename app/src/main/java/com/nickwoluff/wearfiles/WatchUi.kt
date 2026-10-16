@@ -37,6 +37,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import androidx.wear.compose.foundation.ScrollInfoProvider
+import androidx.wear.compose.foundation.lazy.ScalingLazyListScope
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.foundation.requestFocusOnHierarchyActive
@@ -152,7 +153,8 @@ private fun WatchScreen(state: BrowserState, actions: BrowserActions) {
         val spec = rememberTransformationSpec()
         WatchScaffold(state, actions, remember(listState) { ScrollInfoProvider(listState) },
             PaddingValues(horizontal = horizontal)) { padding ->
-            TransformingLazyColumn(state = listState, contentPadding = padding, modifier = Modifier.fillMaxSize()) {
+            TransformingLazyColumn(state = listState, contentPadding = padding, modifier = Modifier.fillMaxSize(),
+                rotaryScrollableBehavior = RotaryScrollableDefaults.behavior(listState, hapticFeedbackEnabled = false)) {
                 item(key = "title") {
                     ListHeader(
                         modifier = Modifier.fillMaxWidth().transformedHeight(this, spec)
@@ -173,7 +175,7 @@ private fun WatchScreen(state: BrowserState, actions: BrowserActions) {
             PaddingValues(start = horizontal, end = horizontal, top = 28.dp, bottom = 28.dp)) { padding ->
             LazyColumn(state = listState, contentPadding = padding, modifier = Modifier.fillMaxSize()
                 .requestFocusOnHierarchyActive()
-                .rotaryScrollable(RotaryScrollableDefaults.behavior(listState), focusRequester),
+                .rotaryScrollable(RotaryScrollableDefaults.behavior(listState, hapticFeedbackEnabled = false), focusRequester),
                 verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 item(key = "title") { ListHeader(Modifier.fillMaxWidth()) { WatchTitle(state) } }
                 items(rows, key = { it.key }) { row -> WatchRow(row, Modifier.fillMaxWidth()) }
@@ -291,12 +293,34 @@ private fun WatchRow(row: BrowserRow, modifier: Modifier, transformation: Surfac
 }
 
 @Composable
+private fun WatchAlertDialog(
+    visible: Boolean,
+    onDismissRequest: () -> Unit,
+    title: @Composable () -> Unit,
+    text: @Composable (() -> Unit)? = null,
+    edgeButton: @Composable (BoxScope.() -> Unit)? = null,
+    content: (ScalingLazyListScope.() -> Unit)? = null,
+) {
+    // 沿用官方弹窗和内容布局，在独立窗口内统一关闭列表震动。
+    // 反馈设置跟随整个弹窗，不能绑定到会滚出屏幕的标题列表项。
+    Dialog(visible = visible, onDismissRequest = onDismissRequest) {
+        WatchHapticFeedbackProvider {
+            if (edgeButton == null) {
+                AlertDialogContent(title = title, text = text, content = content)
+            } else {
+                AlertDialogContent(title = title, text = text, edgeButton = edgeButton, content = content)
+            }
+        }
+    }
+}
+
+@Composable
 private fun OperationDialogs(state: BrowserState, actions: BrowserActions, dialog: String?) {
     val keyboard = LocalSoftwareKeyboardController.current
     val nameFocus = remember { FocusRequester() }
     // 由编辑器直接持有输入状态，避免系统输入法提交组合文字时读到上一帧的名称。
     val nameState = remember(dialog == "name", state.renaming, state.nameInput) { TextFieldState(state.nameInput) }
-    AlertDialog(visible = dialog == "name", onDismissRequest = actions.dismissDialog,
+    WatchAlertDialog(visible = dialog == "name", onDismissRequest = actions.dismissDialog,
         title = { Text(if (state.renaming) "重命名" else "新建文件夹") },
         edgeButton = {
             EdgeButton(onClick = { actions.confirmName(nameState.text.toString()) },
@@ -328,7 +352,7 @@ private fun OperationDialogs(state: BrowserState, actions: BrowserActions, dialo
                 }
             }
         })
-    AlertDialog(visible = state.availableVersion != null && dialog == null && !state.checkingAccess &&
+    WatchAlertDialog(visible = state.availableVersion != null && dialog == null && !state.checkingAccess &&
         state.page != Page.ACCESS && state.page != Page.ADB,
         onDismissRequest = actions.dismissUpdate,
         title = { Text("发现新版本 ${state.availableVersion.orEmpty()}") },
@@ -340,7 +364,7 @@ private fun OperationDialogs(state: BrowserState, actions: BrowserActions, dialo
             item { Button(onClick = actions.dismissUpdate, modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.filledTonalButtonColors()) { Text("稍后再说") } }
         })
-    AlertDialog(visible = dialog == "layout", onDismissRequest = actions.dismissDialog,
+    WatchAlertDialog(visible = dialog == "layout", onDismissRequest = actions.dismissDialog,
         title = { Text("屏幕布局") }, content = {
             ScreenLayout.entries.forEach { layout -> item {
                 RadioButton(selected = state.settings.layout == layout,
@@ -348,7 +372,7 @@ private fun OperationDialogs(state: BrowserState, actions: BrowserActions, dialo
                     modifier = Modifier.fillMaxWidth()) { Text(layout.label) }
             } }
         })
-    AlertDialog(visible = dialog == "share", onDismissRequest = actions.dismissDialog,
+    WatchAlertDialog(visible = dialog == "share", onDismissRequest = actions.dismissDialog,
         title = { Text("分享文件") }, content = {
             state.shareTargets.forEach { target -> item {
                 Button(onClick = { actions.shareTo(target) }, modifier = Modifier.fillMaxWidth(),
@@ -358,7 +382,7 @@ private fun OperationDialogs(state: BrowserState, actions: BrowserActions, dialo
                 }
             } }
         })
-    AlertDialog(visible = dialog == "accent", onDismissRequest = actions.dismissDialog,
+    WatchAlertDialog(visible = dialog == "accent", onDismissRequest = actions.dismissDialog,
         title = { Text("强调色") }, content = {
             accents.forEach { accent -> item {
                 RadioButton(selected = state.settings.accent == accent.argb,
@@ -366,7 +390,7 @@ private fun OperationDialogs(state: BrowserState, actions: BrowserActions, dialo
                     modifier = Modifier.fillMaxWidth()) { Text(accent.label) }
             } }
         })
-    AlertDialog(visible = dialog == "palette", onDismissRequest = actions.dismissDialog,
+    WatchAlertDialog(visible = dialog == "palette", onDismissRequest = actions.dismissDialog,
         title = { Text("调色板风格") }, content = {
             PaletteStyle.entries.forEach { palette -> item {
                 RadioButton(selected = state.settings.palette == palette,
@@ -374,7 +398,7 @@ private fun OperationDialogs(state: BrowserState, actions: BrowserActions, dialo
                     modifier = Modifier.fillMaxWidth()) { Text(palette.label) }
             } }
         })
-    AlertDialog(visible = dialog == "operations", onDismissRequest = actions.dismissDialog,
+    WatchAlertDialog(visible = dialog == "operations", onDismissRequest = actions.dismissDialog,
         title = { Text(state.selected?.name.orEmpty(), maxLines = 2, overflow = TextOverflow.Ellipsis) },
         edgeButton = {
             EdgeButton(onClick = actions.askDelete, enabled = !state.busy,
@@ -394,7 +418,7 @@ private fun OperationDialogs(state: BrowserState, actions: BrowserActions, dialo
                 icon = { Icon(Icons.Default.DriveFileMove, null,
                     modifier = Modifier.size(ButtonDefaults.IconSize)) }) { Text("移动") } }
         })
-    AlertDialog(visible = dialog == "delete", onDismissRequest = actions.dismissDialog,
+    WatchAlertDialog(visible = dialog == "delete", onDismissRequest = actions.dismissDialog,
         title = { Text("删除 ${state.selected?.name.orEmpty()}？", maxLines = 3, overflow = TextOverflow.Ellipsis) },
         text = { Text(if (state.selected?.directory == true) "文件夹及其全部内容将被删除，无法撤销。" else "文件将被删除，无法撤销。") },
         // 官方 AlertDialog 仅提供一个 EdgeButton 槽，取消使用标准列表按钮。
