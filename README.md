@@ -1,6 +1,6 @@
 # 🐾 嗷呜文件 (WearFiles)
 
-![Version](https://img.shields.io/badge/version-1.0.0-brightgreen?style=flat-square)
+![Version](https://img.shields.io/github/release/NickWoluff/WearFiles/all.svg?style=flat-square&color=brightgreen)
 ![Android](https://img.shields.io/badge/Android-7.1%2B-3DDC84?style=flat-square&logo=android&logoColor=white)
 
 **专为圆形与方形智能手表打造的文件管理器，嗷呜！**
