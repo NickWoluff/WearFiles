@@ -69,7 +69,6 @@ fun WatchApp(state: BrowserState, actions: BrowserActions, navController: NavHos
     CompositionLocalProvider(LocalConfiguration provides layoutConfig,
         LocalDensity provides Density(density.density * state.settings.scale / 100f, density.fontScale)) {
     MaterialTheme(colorScheme = colors, motionScheme = MotionScheme.expressive()) {
-        WatchHapticFeedbackProvider {
         AppScaffold(timeText = { WatchTimeText() }) {
             val currentState by rememberUpdatedState(state)
             val currentActions by rememberUpdatedState(actions)
@@ -124,9 +123,8 @@ fun WatchApp(state: BrowserState, actions: BrowserActions, navController: NavHos
                 WatchFloatingNotice(current) { dismissNotice(current.id) }
             } }
         }
-        }
     }
-    }
+}
 }
 
 @Composable
@@ -161,7 +159,7 @@ private fun WatchScreen(state: BrowserState, actions: BrowserActions) {
         WatchScaffold(state, actions, remember(listState) { ScrollInfoProvider(listState) },
             PaddingValues(horizontal = horizontal)) { padding ->
             TransformingLazyColumn(state = listState, contentPadding = padding, modifier = Modifier.fillMaxSize(),
-                rotaryScrollableBehavior = RotaryScrollableDefaults.behavior(listState, hapticFeedbackEnabled = false)) {
+                rotaryScrollableBehavior = RotaryScrollableDefaults.behavior(listState)) {
                 item(key = "title") {
                     ListHeader(
                         modifier = Modifier.fillMaxWidth().transformedHeight(this, spec)
@@ -182,7 +180,7 @@ private fun WatchScreen(state: BrowserState, actions: BrowserActions) {
             PaddingValues(start = horizontal, end = horizontal, top = 28.dp, bottom = 28.dp)) { padding ->
             LazyColumn(state = listState, contentPadding = padding, modifier = Modifier.fillMaxSize()
                 .requestFocusOnHierarchyActive()
-                .rotaryScrollable(RotaryScrollableDefaults.behavior(listState, hapticFeedbackEnabled = false), focusRequester),
+                .rotaryScrollable(RotaryScrollableDefaults.behavior(listState), focusRequester),
                 verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 item(key = "title") { ListHeader(Modifier.fillMaxWidth()) { WatchTitle(state) } }
                 items(rows, key = { it.key }) { row -> WatchRow(row, Modifier.fillMaxWidth()) }
@@ -308,15 +306,12 @@ private fun WatchAlertDialog(
     edgeButton: @Composable (BoxScope.() -> Unit)? = null,
     content: (ScalingLazyListScope.() -> Unit)? = null,
 ) {
-    // 沿用官方弹窗和内容布局，在独立窗口内统一关闭列表震动。
-    // 反馈设置跟随整个弹窗，不能绑定到会滚出屏幕的标题列表项。
+    // 沿用官方弹窗和内容布局及其默认表冠反馈。
     Dialog(visible = visible, onDismissRequest = onDismissRequest) {
-        WatchHapticFeedbackProvider {
-            if (edgeButton == null) {
-                AlertDialogContent(title = title, text = text, content = content)
-            } else {
-                AlertDialogContent(title = title, text = text, edgeButton = edgeButton, content = content)
-            }
+        if (edgeButton == null) {
+            AlertDialogContent(title = title, text = text, content = content)
+        } else {
+            AlertDialogContent(title = title, text = text, edgeButton = edgeButton, content = content)
         }
     }
 }
