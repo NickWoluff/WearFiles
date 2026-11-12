@@ -45,10 +45,12 @@ internal fun browserRows(s: BrowserState, a: BrowserActions): List<BrowserRow> =
                     if (s.page == Page.MOVE) "点按底部按钮移到此目录" else "可在目录操作中创建文件夹", kind = RowKind.INFO))
             s.entries.filter { s.page != Page.MOVE || it.directory }.forEach { entry -> add(BrowserRow(entry.path, entry.name,
                 if (entry.directory) "文件夹" else fileSize(entry.bytes), fileIcon(entry), click = { a.select(entry) },
-                longClick = if (s.page == Page.FILES) ({ a.operations(entry) }) else null, enabled = !s.busy)) }
+                longClick = if (s.page == Page.FILES && !entry.inArchive) ({ a.operations(entry) }) else null, enabled = !s.busy)) }
         }
         Page.TOOLS -> {
-            add(BrowserRow("create", "新建文件夹", icon = Icons.Default.CreateNewFolder, primary = true, click = a.create, enabled = !s.busy))
+            if (archiveLocation(s.path) == null) {
+                add(BrowserRow("create", "新建文件夹", icon = Icons.Default.CreateNewFolder, primary = true, click = a.create, enabled = !s.busy))
+            }
             add(BrowserRow("refresh", "刷新目录", icon = Icons.Default.Refresh, click = a.refresh))
             add(BrowserRow("hidden", "显示隐藏文件", icon = Icons.Default.Visibility, checked = s.hidden, click = a.toggleHidden))
             add(BrowserRow("order", "最近修改优先", "关闭时按名称排列", Icons.AutoMirrored.Filled.Sort, checked = s.newest, click = a.toggleOrder))
@@ -106,7 +108,8 @@ internal fun browserRows(s: BrowserState, a: BrowserActions): List<BrowserRow> =
         Page.DETAILS -> s.selected?.let { file ->
             add(BrowserRow("name", file.name, kind = RowKind.INFO))
             add(BrowserRow("open", "打开文件", icon = Icons.AutoMirrored.Filled.OpenInNew, primary = true, click = a.openFile))
-            add(BrowserRow("share", "分享文件", icon = Icons.Default.Share, click = a.shareFile))
+            if (!file.inArchive) add(BrowserRow("share", "分享文件", icon = Icons.Default.Share, click = a.shareFile))
+            if (file.inArchive) add(BrowserRow("extract-entry", "提取此文件", icon = Icons.Default.Download, click = a.extractEntry))
             add(BrowserRow("size", "大小", fileSize(file.bytes), kind = RowKind.INFO))
             add(BrowserRow("modified", "修改时间", DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(file.modified)), kind = RowKind.INFO))
             add(BrowserRow("path", "位置", file.path, kind = RowKind.INFO))

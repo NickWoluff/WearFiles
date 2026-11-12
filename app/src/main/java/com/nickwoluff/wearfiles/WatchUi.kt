@@ -11,7 +11,9 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
@@ -98,11 +100,16 @@ fun WatchApp(state: BrowserState, actions: BrowserActions, navController: NavHos
                     var fallback by remember(location) { mutableStateOf<BrowserState?>(null) }
                     LaunchedEffect(location, state.access, state.hidden, state.newest) {
                         if (snapshot == null && location != state.location) {
-                            val result = if (page == Page.FILES && state.access)
-                                StorageRepository(File(state.root)).list(path, state.hidden, state.newest, android.os.Build.VERSION.SDK_INT >= 30)
+                            val result = if (page == Page.FILES && state.access) {
+                                if (archiveLocation(path) != null) ArchiveRepository().list(path, state.hidden, state.newest)
+                                else StorageRepository(File(state.root)).list(path, state.hidden, state.newest, android.os.Build.VERSION.SDK_INT >= 30)
+                            }
                             else DirectoryResult()
                             fallback = state.copy(page = page, path = path,
-                                title = if (page == Page.HOME) "嗷呜文件" else if (path == state.root) "内部存储" else File(path).name,
+                                title = if (page == Page.HOME) "嗷呜文件" else if (archiveLocation(path) != null) {
+                                    val location = requireNotNull(archiveLocation(path))
+                                    location.directory.trimEnd('/').substringAfterLast('/').ifEmpty { File(location.archive).name }
+                                } else if (path == state.root) "内部存储" else File(path).name,
                                 entries = result.entries, error = result.error, loading = false, selected = null)
                         }
                     }
@@ -382,6 +389,15 @@ private fun OperationDialogs(state: BrowserState, actions: BrowserActions, dialo
                 }
             } }
         })
+    WatchAlertDialog(visible = dialog == "compress", onDismissRequest = actions.dismissDialog,
+        title = { Text("选择压缩格式") }, content = {
+            ArchiveFormat.entries.filter { !it.singleFileOnly || !state.compressingDirectory }.forEach { format -> item {
+                Button(onClick = { actions.compress(format) }, enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.filledTonalButtonColors()) {
+                    Text(format.label)
+                }
+            } }
+        })
     WatchAlertDialog(visible = dialog == "accent", onDismissRequest = actions.dismissDialog,
         title = { Text("强调色") }, content = {
             accents.forEach { accent -> item {
@@ -400,19 +416,33 @@ private fun OperationDialogs(state: BrowserState, actions: BrowserActions, dialo
         })
     WatchAlertDialog(visible = dialog == "operations", onDismissRequest = actions.dismissDialog,
         title = { Text(state.selected?.name.orEmpty(), maxLines = 2, overflow = TextOverflow.Ellipsis) },
-        edgeButton = {
+        edgeButton = if (state.selected?.inArchive == true) null else ({
             EdgeButton(onClick = actions.askDelete, enabled = !state.busy,
                 buttonSize = EdgeButtonSize.Medium,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error,
                     contentColor = MaterialTheme.colorScheme.onError)) { Text("删除") }
-        },
+        }),
         content = {
-            item { Button(onClick = actions.rename, enabled = !state.busy,
+            if (state.selected?.inArchive != true) item { Button(onClick = actions.chooseCompression, enabled = !state.busy,
+                modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.filledTonalButtonColors(),
+                icon = { Icon(Icons.Default.Archive, null, modifier = Modifier.size(ButtonDefaults.IconSize)) }) {
+                Text("压缩")
+            } }
+            if (state.selected?.inArchive == false && isArchiveName(state.selected.name)) {
+                item { Button(onClick = actions.enterArchive, enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.filledTonalButtonColors()) { Text("浏览压缩包") } }
+                item { Button(onClick = actions.extract, enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.filledTonalButtonColors(),
+                    icon = { Icon(Icons.Default.Unarchive, null, modifier = Modifier.size(ButtonDefaults.IconSize)) }) {
+                    Text("解压到当前目录")
+                } }
+            }
+            if (state.selected?.inArchive != true) item { Button(onClick = actions.rename, enabled = !state.busy,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.filledTonalButtonColors(),
                 icon = { Icon(Icons.Default.DriveFileRenameOutline, null,
                     modifier = Modifier.size(ButtonDefaults.IconSize)) }) { Text("重命名") } }
-            item { Button(onClick = actions.move, enabled = !state.busy,
+            if (state.selected?.inArchive != true) item { Button(onClick = actions.move, enabled = !state.busy,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.filledTonalButtonColors(),
                 icon = { Icon(Icons.Default.DriveFileMove, null,

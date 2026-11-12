@@ -6,3 +6,7 @@
 
 -keep class com.google.wear.input.WearHapticFeedbackConstants { *; }
 
+# Commons Compress 将 Zstandard 与 Brotli 作为可选扩展；应用未打包这两个解码器。
+-dontwarn com.github.luben.zstd.**
+-dontwarn org.brotli.dec.**
+

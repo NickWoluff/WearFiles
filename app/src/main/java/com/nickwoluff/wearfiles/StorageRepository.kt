@@ -6,7 +6,14 @@ import java.text.DecimalFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-data class FileEntry(val path: String, val name: String, val directory: Boolean, val bytes: Long, val modified: Long)
+data class FileEntry(
+    val path: String,
+    val name: String,
+    val directory: Boolean,
+    val bytes: Long,
+    val modified: Long,
+    val inArchive: Boolean = false
+)
 data class DirectoryResult(val entries: List<FileEntry> = emptyList(), val error: String? = null)
 data class StorageSpace(val available: Long = 0, val total: Long = 0)
 data class FileOperationResult(val success: Boolean, val message: String)
@@ -25,8 +32,8 @@ class StorageRepository(val root: File) {
         try {
             readable = root.listFiles() != null
             if (!readable) return@withContext StorageAccessCheck(error = "无法读取共享存储")
-            probe = File.createTempFile(".aowu-access-", ".tmp", root)
-            val content = byteArrayOf(65, 79, 87, 85)
+            probe = File.createTempFile(".awoo-access-", ".tmp", root)
+            val content = "AWOO".toByteArray(Charsets.US_ASCII)
             probe.writeBytes(content)
             writable = true
             readable = probe.readBytes().contentEquals(content)

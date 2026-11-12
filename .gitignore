@@ -1,9 +1,11 @@
 .gradle/
+.gradle-temp/
 .kotlin/
 .socket-tmp/
 build/
 app/build/
 app/release/
+tools/
 VERIFICATION.md
 local.properties
 design-reference/

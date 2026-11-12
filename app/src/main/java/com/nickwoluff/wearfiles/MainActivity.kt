@@ -80,7 +80,8 @@ data class BrowserState(
     val checkingAccess: Boolean = false, val accessCheck: StorageAccessCheck = StorageAccessCheck(),
     val adbCommands: String = "", val localVersion: String = "", val autoCheckUpdates: Boolean = true,
     val checkingUpdate: Boolean = false, val availableVersion: String? = null,
-    val copyright: String = "", val nameInput: String = "", val renaming: Boolean = false
+    val copyright: String = "", val nameInput: String = "", val renaming: Boolean = false,
+    val compressingDirectory: Boolean = false
 ) {
     val location: BrowserLocation get() = BrowserLocation(page, if (page == Page.HOME) root else path,
         if (page == Page.DETAILS) selected?.path else null)
@@ -98,7 +99,8 @@ data class BrowserActions(
     val adbGuide: () -> Unit, val copyAdbCommands: () -> Unit, val skipAccess: () -> Unit,
     val checkUpdate: () -> Unit, val toggleAutoUpdate: () -> Unit,
     val dismissUpdate: () -> Unit, val openRelease: () -> Unit,
-    val confirmName: (String) -> Unit
+    val confirmName: (String) -> Unit, val chooseCompression: () -> Unit, val compress: (ArchiveFormat) -> Unit,
+    val extract: () -> Unit, val enterArchive: () -> Unit, val extractEntry: () -> Unit
 )
 
 @Composable
@@ -126,8 +128,8 @@ private fun FileManagerApp(activity: MainActivity, resumeTick: Int, updates: Upd
     val query = DirectoryQuery(path, hidden, newest)
     var space by remember { mutableStateOf(store.readSpace()) }
     var selected by rememberSaveable(stateSaver = androidx.compose.runtime.saveable.listSaver(
-        save = { entry: FileEntry? -> entry?.let { listOf(it.path, it.name, it.directory, it.bytes, it.modified) } ?: emptyList() },
-        restore = { if (it.isEmpty()) null else FileEntry(it[0] as String, it[1] as String, it[2] as Boolean, it[3] as Long, it[4] as Long) }
+        save = { entry: FileEntry? -> entry?.let { listOf(it.path, it.name, it.directory, it.bytes, it.modified, it.inArchive) } ?: emptyList() },
+        restore = { if (it.isEmpty()) null else FileEntry(it[0] as String, it[1] as String, it[2] as Boolean, it[3] as Long, it[4] as Long, it.getOrNull(5) as? Boolean ?: false) }
     )) { mutableStateOf<FileEntry?>(null) }
     var dialog by rememberSaveable { mutableStateOf<String?>(null) }
     var shareTargets by remember { mutableStateOf<List<ShareTarget>>(emptyList()) }
@@ -137,6 +139,7 @@ private fun FileManagerApp(activity: MainActivity, resumeTick: Int, updates: Upd
     var moveSource by rememberSaveable { mutableStateOf<String?>(null) }
     var moveOrigin by rememberSaveable { mutableStateOf(repository.root.path) }
     val scope = rememberCoroutineScope()
+    val archives = remember { ArchiveRepository() }
     var notice by remember { mutableStateOf<WatchNotice?>(null) }
     var noticeId by remember { mutableIntStateOf(0) }
     fun notify(message: String, kind: NoticeKind = NoticeKind.INFO) {
@@ -217,8 +220,11 @@ private fun FileManagerApp(activity: MainActivity, resumeTick: Int, updates: Upd
         try {
             space = repository.space()
             store.writeSpace(space)
-            listing = if (access) repository.list(path, hidden, newest, Build.VERSION.SDK_INT >= 30)
-                else DirectoryResult(error = "需要允许访问内部存储")
+            listing = when {
+                !access -> DirectoryResult(error = "需要允许访问内部存储")
+                archiveLocation(path) != null -> archives.list(path, hidden, newest)
+                else -> repository.list(path, hidden, newest, Build.VERSION.SDK_INT >= 30)
+            }
             loadedQuery = query
             if (access) {
                 cache[query] = listing
@@ -247,8 +253,26 @@ private fun FileManagerApp(activity: MainActivity, resumeTick: Int, updates: Upd
             if (page != destination) go(destination)
         }
     }
+    fun openMaterializedFile(file: File, name: String) {
+        try {
+            val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.files", file)
+            val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(name.substringAfterLast('.', "").lowercase())
+                ?: "application/octet-stream"
+            activity.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+        } catch (_: ActivityNotFoundException) { notify("设备上没有支持此文件的应用", NoticeKind.ERROR) }
+        catch (_: Exception) { notify("无法打开归档内文件", NoticeKind.ERROR) }
+    }
     fun externalFile(share: Boolean, target: ShareTarget? = null) {
         val entry = selected ?: return
+        if (entry.inArchive) {
+            if (share) { notify("请先提取归档内文件再分享", NoticeKind.ERROR); return }
+            scope.launch {
+                val file = archives.materialize(entry.path, activity.cacheDir)
+                if (file == null) notify("无法读取归档内文件", NoticeKind.ERROR)
+                else openMaterializedFile(file, entry.name)
+            }
+            return
+        }
         try {
             val file = File(entry.path)
             if (!file.isFile || !file.canRead()) {
@@ -283,7 +307,10 @@ private fun FileManagerApp(activity: MainActivity, resumeTick: Int, updates: Upd
     val state = BrowserState(page, path, repository.root.path,
         when (page) {
             Page.HOME -> "嗷呜文件"
-            Page.FILES -> if (path == repository.root.path) "内部存储" else File(path).name
+            Page.FILES -> if (archiveLocation(path) != null) {
+                val location = requireNotNull(archiveLocation(path))
+                location.directory.trimEnd('/').substringAfterLast('/').ifEmpty { File(location.archive).name }
+            } else if (path == repository.root.path) "内部存储" else File(path).name
             Page.TOOLS -> "目录操作"; Page.ACCESS -> "存储权限"; Page.DETAILS -> "文件详情"
             Page.SETTINGS -> "应用设置"; Page.THEME -> "主题设置"
             Page.ADB -> "ADB 授权指引"
@@ -295,7 +322,7 @@ private fun FileManagerApp(activity: MainActivity, resumeTick: Int, updates: Upd
                 args.getString("file")?.takeIf { it.isNotEmpty() })
         }, shareTargets, checkingAccess, accessCheck, adbCommands, localVersion,
         autoCheckUpdates, updates.checking, updates.availableVersion, copyright,
-        nameInput, inputAction == "rename")
+        nameInput, inputAction == "rename", selected?.directory == true)
     val actions = BrowserActions(
         home = { nav.popBackStack(BrowserLocation(Page.HOME, repository.root.path).route, false) },
         browse = {
@@ -305,6 +332,10 @@ private fun FileManagerApp(activity: MainActivity, resumeTick: Int, updates: Upd
         select = {
             if (page == Page.MOVE) { if (it.directory) go(Page.MOVE, it.path) }
             else if (it.directory) go(Page.FILES, it.path)
+            else if (!it.inArchive && isArchiveName(it.name)) {
+                selected = it
+                go(Page.FILES, archivePath(it.path))
+            }
             else { selected = it; go(Page.DETAILS, file = it.path) }
         },
         tools = { go(Page.TOOLS) }, accessPage = {
@@ -365,7 +396,20 @@ private fun FileManagerApp(activity: MainActivity, resumeTick: Int, updates: Upd
                 notify("无法打开浏览器，请在手机访问 github.com/NickWoluff/WearFiles/releases", NoticeKind.ERROR)
             }
         },
-        confirmName = { confirmName(it) }
+        confirmName = { confirmName(it) },
+        chooseCompression = { if (!busy && selected?.inArchive == false) dialog = "compress" },
+        compress = { format -> selected?.takeIf { !it.inArchive }?.let { item ->
+            dialog = null
+            perform({ archives.compress(item.path, format) })
+        } },
+        extract = { selected?.takeIf { !it.inArchive }?.let { item ->
+            dialog = null
+            perform({ archives.extract(item.path, path) })
+        } },
+        enterArchive = { selected?.takeIf { !it.inArchive && isArchiveName(it.name) }?.let { item -> go(Page.FILES, archivePath(item.path)) } }
+        ,extractEntry = { selected?.takeIf { it.inArchive }?.let { item ->
+            perform({ archives.extractFile(item.path, File(requireNotNull(archiveLocation(item.path)).archive).parent ?: path) })
+        } }
     )
     WatchApp(state, actions, nav, dialog, notice) { id -> if (notice?.id == id) notice = null }
 }
